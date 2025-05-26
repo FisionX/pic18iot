@@ -15,46 +15,14 @@
 volatile static uint8_t digit[NDIGITS] = { 0 };
 volatile static uint8_t dsp_en = 0;
 
-void setup(void);
 void isr(void) __interrupt (1);
 void tmr_isr(void);
 uint8_t number_to_7seg(uint8_t);
 void display(uint16_t);
+void start_adc(void);
+inline void setup(void);
 int main(void);
 
-void setup(void){
-    /* Port setup */
-    LATD = 0;
-    TRISD = 0;
-    
-    TRISB = 0xff;
-    LATB = 0x00;
-    ADCON1 = 0xf;
-
-    TRISE = 0;
-    LATE = 0;
-
-    TRISA = 0;
-    LATA = 0;
-
-    /* Interrupt setup */
-    INTCONbits.GIE = 1;
-    INTCONbits.PEIE = 1;
-    INTCONbits.RBIE = 0;
-    INTCON2bits.RBPU = 0;
-    INTCON2bits.RBIP = 1;
-    RCONbits.IPEN = 1;
-
-    /* timer interrupt setup */
-    INTCONbits.TMR0IE = 1;
-    INTCON2bits.TMR0IP = 1;
-
-    T0CONbits.T08BIT = 1;
-    T0CONbits.T0CS = 0; /* Source internal oscilator */
-    T0CONbits.PSA = 0;
-    T0CONbits.T0PS = 0x7;
-    T0CONbits.TMR0ON = 1;
-}
 
 void isr(void) __interrupt (1) {
     if (INTCONbits.TMR0IF){
@@ -135,14 +103,54 @@ void display(uint16_t num){
         i++;
     }
 }
+void start_adc(void) {
+    ADCON0bits.CHS = 0;
+    ADCON1bits.PCFG = 0xE;
+    ADCON2bits.ADFM = 1; 
+    ADCON2bits.ACQT = 0x5; 
+    ADCON2bits.ADCS = 0x1; 
+    ADCON0bits.ADON = 1;
+}
+inline void setup(void){
+    /* Port setup */
+    LATD = 0;
+    TRISD = 0;
+    
+    TRISB = 0xff;
+    LATB = 0x00;
+    ADCON1 = 0xf;
 
+    TRISE = 0;
+    LATE = 0;
+
+    TRISA = 0;
+    LATA = 0;
+
+    /* Interrupt setup */
+    INTCONbits.GIE = 1;
+    INTCONbits.PEIE = 1;
+    INTCONbits.RBIE = 0;
+    INTCON2bits.RBPU = 0;
+    INTCON2bits.RBIP = 1;
+    RCONbits.IPEN = 1;
+
+    /* timer interrupt setup */
+    INTCONbits.TMR0IE = 1;
+    INTCON2bits.TMR0IP = 1;
+
+    T0CONbits.T08BIT = 1;
+    T0CONbits.T0CS = 0; /* Source internal oscilator */
+    T0CONbits.PSA = 0;
+    T0CONbits.T0PS = 0x7;
+    T0CONbits.TMR0ON = 1;
+}
 int main(void) {
-    uint16_t cuenta = 0;
+    uint16_t count = 0;
     setup();
     for (;;) {
-        display(cuenta);
+        display(count);
         delay1ktcy(500);
-        cuenta++;
+        count++;
     }
     return 0;
 }
