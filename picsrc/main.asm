@@ -16,11 +16,14 @@
 ;--------------------------------------------------------
 ; public variables in this module
 ;--------------------------------------------------------
-	global	_setup
 	global	_isr
 	global	_tmr_isr
+	global	_xGetTicks
+	global	_displayIsr
 	global	_number_to_7seg
 	global	_display
+	global	_start_adc
+	global	_setup
 	global	_main
 	global	_sram_end
 
@@ -277,7 +280,6 @@
 	extern	_TOSL
 	extern	_TOSH
 	extern	_TOSU
-	extern	_delay1ktcy
 	extern	__moduint
 	extern	__divuint
 
@@ -304,6 +306,7 @@ PRODH	equ	0xff4
 
 
 	idata
+_tick_count	db	0x00, 0x00, 0x00, 0x00
 _digit	db	0x00, 0x00, 0x00, 0x00
 _dsp_en	db	0x00
 
@@ -341,33 +344,204 @@ ivec_0x1_isr:
 ; ; Starting pCode block
 S_main__main	code
 _main:
-;	.line	141; main.c	setup();
-	CALL	_setup
-	CLRF	r0x00
-	CLRF	r0x01
-_00209_DS_:
-;	.line	143; main.c	display(cuenta);
-	MOVF	r0x01, W
-	MOVWF	POSTDEC1
+;	.line	167; main.c	uint32_t prevdisptick = xGetTicks();
+	CALL	_xGetTicks
+	MOVWF	r0x00
+	MOVFF	PRODL, r0x01
+	MOVFF	PRODH, r0x02
+	MOVFF	FSR0L, r0x03
+;	.line	132; main.c	LATD = 0;
+	CLRF	_LATD
+;	.line	133; main.c	TRISD = 0;
+	CLRF	_TRISD
+;	.line	135; main.c	TRISB = 0xff;
+	MOVLW	0xff
+	MOVWF	_TRISB
+;	.line	136; main.c	LATB = 0x00;
+	CLRF	_LATB
+;	.line	137; main.c	ADCON1 = 0xf;
+	MOVLW	0x0f
+	MOVWF	_ADCON1
+;	.line	139; main.c	TRISE = 0;
+	CLRF	_TRISE
+;	.line	140; main.c	LATE = 0;
+	CLRF	_LATE
+;	.line	142; main.c	TRISA = 0;
+	CLRF	_TRISA
+;	.line	143; main.c	LATA = 0;
+	CLRF	_LATA
+;	.line	146; main.c	INTCONbits.GIE = 1;
+	BSF	_INTCONbits, 7
+;	.line	147; main.c	INTCONbits.PEIE = 1;
+	BSF	_INTCONbits, 6
+;	.line	148; main.c	INTCONbits.RBIE = 0;
+	BCF	_INTCONbits, 3
+;	.line	149; main.c	INTCON2bits.RBPU = 0;
+	BCF	_INTCON2bits, 7
+;	.line	150; main.c	INTCON2bits.RBIP = 1;
+	BSF	_INTCON2bits, 0
+;	.line	151; main.c	RCONbits.IPEN = 1;
+	BSF	_RCONbits, 7
+;	.line	154; main.c	INTCONbits.TMR0IE = 1;
+	BSF	_INTCONbits, 5
+;	.line	155; main.c	INTCON2bits.TMR0IP = 1;
+	BSF	_INTCON2bits, 2
+;	.line	157; main.c	T0CONbits.T08BIT = 1;
+	BSF	_T0CONbits, 6
+;	.line	158; main.c	T0CONbits.T0CS = 0; /* Source internal oscilator */
+	BCF	_T0CONbits, 5
+;	.line	159; main.c	T0CONbits.PSA = 0;
+	BCF	_T0CONbits, 3
+;	.line	160; main.c	T0CONbits.T0PS = 0x7;
+	MOVF	_T0CONbits, W
+	ANDLW	0xf8
+	IORLW	0x07
+	MOVWF	_T0CONbits
+;	.line	161; main.c	T0CONbits.TMR0ON = 1;
+	BSF	_T0CONbits, 7
+_00227_DS_:
+;	.line	173; main.c	if(xGetTicks() - prevdisptick >= disptick) {
+	CALL	_xGetTicks
+	MOVWF	r0x04
+	MOVFF	PRODL, r0x05
+	MOVFF	PRODH, r0x06
+	MOVFF	FSR0L, r0x07
 	MOVF	r0x00, W
-	MOVWF	POSTDEC1
-	CALL	_display
-	MOVF	POSTINC1, F
-	MOVF	POSTINC1, F
-;	.line	144; main.c	delay1ktcy(500);
-	MOVLW	0xf4
-	CALL	_delay1ktcy
-;	.line	145; main.c	cuenta++;
-	INFSNZ	r0x00, F
-	INCF	r0x01, F
-	BRA	_00209_DS_
-;	.line	148; main.c	}
+	SUBWF	r0x04, F
+	MOVF	r0x01, W
+	SUBWFB	r0x05, F
+	MOVF	r0x02, W
+	SUBWFB	r0x06, F
+	MOVF	r0x03, W
+	SUBWFB	r0x07, F
+	MOVLW	0x00
+	SUBWF	r0x07, W
+	BNZ	_00243_DS_
+	MOVLW	0x00
+	SUBWF	r0x06, W
+	BNZ	_00243_DS_
+	MOVLW	0x00
+	SUBWF	r0x05, W
+	BNZ	_00243_DS_
+	MOVLW	0x14
+	SUBWF	r0x04, W
+_00243_DS_:
+	BNC	_00227_DS_
+;	.line	174; main.c	PORTD = !PORTD;
+	MOVF	_PORTD, W
+	BSF	STATUS, 0
+	TSTFSZ	WREG
+	BCF	STATUS, 0
+	CLRF	r0x04
+	RLCF	r0x04, F
+	MOVF	r0x04, W
+	MOVWF	_PORTD
+;	.line	175; main.c	prevdisptick = xGetTicks();
+	CALL	_xGetTicks
+	MOVWF	r0x00
+	MOVFF	PRODL, r0x01
+	MOVFF	PRODH, r0x02
+	MOVFF	FSR0L, r0x03
+	BRA	_00227_DS_
+;	.line	179; main.c	}
+	RETURN	
+
+; ; Starting pCode block
+S_main__setup	code
+_setup:
+;	.line	130; main.c	inline void setup(void){
+	MOVFF	FSR2L, POSTDEC1
+	MOVFF	FSR1L, FSR2L
+;	.line	132; main.c	LATD = 0;
+	CLRF	_LATD
+;	.line	133; main.c	TRISD = 0;
+	CLRF	_TRISD
+;	.line	135; main.c	TRISB = 0xff;
+	MOVLW	0xff
+	MOVWF	_TRISB
+;	.line	136; main.c	LATB = 0x00;
+	CLRF	_LATB
+;	.line	137; main.c	ADCON1 = 0xf;
+	MOVLW	0x0f
+	MOVWF	_ADCON1
+;	.line	139; main.c	TRISE = 0;
+	CLRF	_TRISE
+;	.line	140; main.c	LATE = 0;
+	CLRF	_LATE
+;	.line	142; main.c	TRISA = 0;
+	CLRF	_TRISA
+;	.line	143; main.c	LATA = 0;
+	CLRF	_LATA
+;	.line	146; main.c	INTCONbits.GIE = 1;
+	BSF	_INTCONbits, 7
+;	.line	147; main.c	INTCONbits.PEIE = 1;
+	BSF	_INTCONbits, 6
+;	.line	148; main.c	INTCONbits.RBIE = 0;
+	BCF	_INTCONbits, 3
+;	.line	149; main.c	INTCON2bits.RBPU = 0;
+	BCF	_INTCON2bits, 7
+;	.line	150; main.c	INTCON2bits.RBIP = 1;
+	BSF	_INTCON2bits, 0
+;	.line	151; main.c	RCONbits.IPEN = 1;
+	BSF	_RCONbits, 7
+;	.line	154; main.c	INTCONbits.TMR0IE = 1;
+	BSF	_INTCONbits, 5
+;	.line	155; main.c	INTCON2bits.TMR0IP = 1;
+	BSF	_INTCON2bits, 2
+;	.line	157; main.c	T0CONbits.T08BIT = 1;
+	BSF	_T0CONbits, 6
+;	.line	158; main.c	T0CONbits.T0CS = 0; /* Source internal oscilator */
+	BCF	_T0CONbits, 5
+;	.line	159; main.c	T0CONbits.PSA = 0;
+	BCF	_T0CONbits, 3
+;	.line	160; main.c	T0CONbits.T0PS = 0x7;
+	MOVF	_T0CONbits, W
+	ANDLW	0xf8
+	IORLW	0x07
+	MOVWF	_T0CONbits
+;	.line	161; main.c	T0CONbits.TMR0ON = 1;
+	BSF	_T0CONbits, 7
+;	.line	162; main.c	}
+	MOVFF	PREINC1, FSR2L
+	RETURN	
+
+; ; Starting pCode block
+S_main__start_adc	code
+_start_adc:
+;	.line	122; main.c	void start_adc(void) {
+	MOVFF	FSR2L, POSTDEC1
+	MOVFF	FSR1L, FSR2L
+;	.line	123; main.c	ADCON0bits.CHS = 0;
+	MOVF	_ADCON0bits, W
+	ANDLW	0xc3
+	MOVWF	_ADCON0bits
+;	.line	124; main.c	ADCON1bits.PCFG = 0xE;
+	MOVF	_ADCON1bits, W
+	ANDLW	0xf0
+	IORLW	0x0e
+	MOVWF	_ADCON1bits
+;	.line	125; main.c	ADCON2bits.ADFM = 1; 
+	BSF	_ADCON2bits, 7
+;	.line	126; main.c	ADCON2bits.ACQT = 0x5; 
+	MOVF	_ADCON2bits, W
+	ANDLW	0xc7
+	IORLW	0x28
+	MOVWF	_ADCON2bits
+;	.line	127; main.c	ADCON2bits.ADCS = 0x1; 
+	MOVF	_ADCON2bits, W
+	ANDLW	0xf8
+	IORLW	0x01
+	MOVWF	_ADCON2bits
+;	.line	128; main.c	ADCON0bits.ADON = 1;
+	BSF	_ADCON0bits, 0
+;	.line	129; main.c	}
+	MOVFF	PREINC1, FSR2L
 	RETURN	
 
 ; ; Starting pCode block
 S_main__display	code
 _display:
-;	.line	129; main.c	void display(uint16_t num){
+;	.line	113; main.c	void display(uint16_t num){
 	MOVFF	FSR2L, POSTDEC1
 	MOVFF	FSR1L, FSR2L
 	MOVFF	r0x00, POSTDEC1
@@ -383,25 +557,25 @@ _display:
 	MOVFF	PLUSW2, r0x00
 	MOVLW	0x03
 	MOVFF	PLUSW2, r0x01
-;	.line	131; main.c	if (num > 9999) return;
+;	.line	115; main.c	if (num > 9999) return;
 	MOVF	r0x00, W
 	MOVWF	r0x02
 	MOVF	r0x01, W
 	MOVWF	r0x03
 	MOVLW	0x27
 	SUBWF	r0x03, W
-	BNZ	_00203_DS_
+	BNZ	_00208_DS_
 	MOVLW	0x10
 	SUBWF	r0x02, W
-_00203_DS_:
-	BC	_00182_DS_
-;	.line	132; main.c	while(num) {
+_00208_DS_:
+	BC	_00187_DS_
+;	.line	116; main.c	while(num) {
 	CLRF	r0x02
-_00179_DS_:
+_00184_DS_:
 	MOVF	r0x01, W
 	IORWF	r0x00, W
-	BZ	_00182_DS_
-;	.line	133; main.c	digit[i] = num%10;
+	BZ	_00187_DS_
+;	.line	117; main.c	digit[i] = num%10;
 	MOVLW	LOW(_digit)
 	ADDWF	r0x02, W
 	MOVWF	r0x03
@@ -428,7 +602,7 @@ _00179_DS_:
 	MOVFF	r0x03, FSR0L
 	MOVFF	r0x04, FSR0H
 	MOVFF	r0x07, INDF0
-;	.line	134; main.c	num = num/10;
+;	.line	118; main.c	num = num/10;
 	MOVLW	0x00
 	MOVWF	POSTDEC1
 	MOVLW	0x0a
@@ -446,11 +620,11 @@ _00179_DS_:
 	MOVWF	r0x00
 	MOVF	r0x04, W
 	MOVWF	r0x01
-;	.line	135; main.c	i++;
+;	.line	119; main.c	i++;
 	INCF	r0x02, F
-	BRA	_00179_DS_
-_00182_DS_:
-;	.line	137; main.c	}
+	BRA	_00184_DS_
+_00187_DS_:
+;	.line	121; main.c	}
 	MOVFF	PREINC1, r0x08
 	MOVFF	PREINC1, r0x07
 	MOVFF	PREINC1, r0x06
@@ -466,17 +640,17 @@ _00182_DS_:
 ; ; Starting pCode block
 S_main__number_to_7seg	code
 _number_to_7seg:
-;	.line	91; main.c	uint8_t number_to_7seg(uint8_t number) {
+;	.line	75; main.c	uint8_t number_to_7seg(uint8_t number) {
 	MOVFF	FSR2L, POSTDEC1
 	MOVFF	FSR1L, FSR2L
 	MOVFF	r0x00, POSTDEC1
 	MOVLW	0x02
 	MOVFF	PLUSW2, r0x00
-;	.line	92; main.c	switch (number) {
+;	.line	76; main.c	switch (number) {
 	MOVLW	0x10
 	SUBWF	r0x00, W
 	BTFSC	STATUS, 0
-	BRA	_00161_DS_
+	BRA	_00166_DS_
 	CLRF	PCLATH
 	CLRF	PCLATU
 	RLCF	r0x00, W
@@ -484,20 +658,15 @@ _number_to_7seg:
 	RLCF	WREG, W
 	RLCF	PCLATH, F
 	ANDLW	0xfc
-	ADDLW	LOW(_00172_DS_)
+	ADDLW	LOW(_00177_DS_)
 	MOVWF	POSTDEC1
-	MOVLW	HIGH(_00172_DS_)
+	MOVLW	HIGH(_00177_DS_)
 	ADDWFC	PCLATH, F
-	MOVLW	UPPER(_00172_DS_)
+	MOVLW	UPPER(_00177_DS_)
 	ADDWFC	PCLATU, F
 	MOVF	PREINC1, W
 	MOVWF	PCL
-_00172_DS_:
-	GOTO	_00145_DS_
-	GOTO	_00146_DS_
-	GOTO	_00147_DS_
-	GOTO	_00148_DS_
-	GOTO	_00149_DS_
+_00177_DS_:
 	GOTO	_00150_DS_
 	GOTO	_00151_DS_
 	GOTO	_00152_DS_
@@ -509,91 +678,96 @@ _00172_DS_:
 	GOTO	_00158_DS_
 	GOTO	_00159_DS_
 	GOTO	_00160_DS_
-_00145_DS_:
-;	.line	94; main.c	return 0x3F;
-	MOVLW	0x3f
-	BRA	_00163_DS_
-_00146_DS_:
-;	.line	96; main.c	return 0x06;
-	MOVLW	0x06
-	BRA	_00163_DS_
-_00147_DS_:
-;	.line	98; main.c	return 0x5B;
-	MOVLW	0x5b
-	BRA	_00163_DS_
-_00148_DS_:
-;	.line	100; main.c	return 0x4F;
-	MOVLW	0x4f
-	BRA	_00163_DS_
-_00149_DS_:
-;	.line	102; main.c	return 0x66;
-	MOVLW	0x66
-	BRA	_00163_DS_
+	GOTO	_00161_DS_
+	GOTO	_00162_DS_
+	GOTO	_00163_DS_
+	GOTO	_00164_DS_
+	GOTO	_00165_DS_
 _00150_DS_:
-;	.line	104; main.c	return 0x6D;
-	MOVLW	0x6d
-	BRA	_00163_DS_
+;	.line	78; main.c	return 0x3F;
+	MOVLW	0x3f
+	BRA	_00168_DS_
 _00151_DS_:
-;	.line	106; main.c	return 0x7D;
-	MOVLW	0x7d
-	BRA	_00163_DS_
+;	.line	80; main.c	return 0x06;
+	MOVLW	0x06
+	BRA	_00168_DS_
 _00152_DS_:
-;	.line	108; main.c	return 0x07;
-	MOVLW	0x07
-	BRA	_00163_DS_
+;	.line	82; main.c	return 0x5B;
+	MOVLW	0x5b
+	BRA	_00168_DS_
 _00153_DS_:
-;	.line	110; main.c	return 0x7F;
-	MOVLW	0x7f
-	BRA	_00163_DS_
+;	.line	84; main.c	return 0x4F;
+	MOVLW	0x4f
+	BRA	_00168_DS_
 _00154_DS_:
-;	.line	112; main.c	return 0x6F;
-	MOVLW	0x6f
-	BRA	_00163_DS_
+;	.line	86; main.c	return 0x66;
+	MOVLW	0x66
+	BRA	_00168_DS_
 _00155_DS_:
-;	.line	114; main.c	return 0x77;
-	MOVLW	0x77
-	BRA	_00163_DS_
+;	.line	88; main.c	return 0x6D;
+	MOVLW	0x6d
+	BRA	_00168_DS_
 _00156_DS_:
-;	.line	116; main.c	return 0x7c;
-	MOVLW	0x7c
-	BRA	_00163_DS_
+;	.line	90; main.c	return 0x7D;
+	MOVLW	0x7d
+	BRA	_00168_DS_
 _00157_DS_:
-;	.line	118; main.c	return 0x39;
-	MOVLW	0x39
-	BRA	_00163_DS_
+;	.line	92; main.c	return 0x07;
+	MOVLW	0x07
+	BRA	_00168_DS_
 _00158_DS_:
-;	.line	120; main.c	return 0x5e;
-	MOVLW	0x5e
-	BRA	_00163_DS_
+;	.line	94; main.c	return 0x7F;
+	MOVLW	0x7f
+	BRA	_00168_DS_
 _00159_DS_:
-;	.line	122; main.c	return 0x79;
-	MOVLW	0x79
-	BRA	_00163_DS_
+;	.line	96; main.c	return 0x6F;
+	MOVLW	0x6f
+	BRA	_00168_DS_
 _00160_DS_:
-;	.line	124; main.c	return 0x71;
-	MOVLW	0x71
-	BRA	_00163_DS_
+;	.line	98; main.c	return 0x77;
+	MOVLW	0x77
+	BRA	_00168_DS_
 _00161_DS_:
-;	.line	126; main.c	return 0;
-	CLRF	WREG
+;	.line	100; main.c	return 0x7c;
+	MOVLW	0x7c
+	BRA	_00168_DS_
+_00162_DS_:
+;	.line	102; main.c	return 0x39;
+	MOVLW	0x39
+	BRA	_00168_DS_
 _00163_DS_:
-;	.line	128; main.c	}
+;	.line	104; main.c	return 0x5e;
+	MOVLW	0x5e
+	BRA	_00168_DS_
+_00164_DS_:
+;	.line	106; main.c	return 0x79;
+	MOVLW	0x79
+	BRA	_00168_DS_
+_00165_DS_:
+;	.line	108; main.c	return 0x71;
+	MOVLW	0x71
+	BRA	_00168_DS_
+_00166_DS_:
+;	.line	110; main.c	return 0;
+	CLRF	WREG
+_00168_DS_:
+;	.line	112; main.c	}
 	MOVFF	PREINC1, r0x00
 	MOVFF	PREINC1, FSR2L
 	RETURN	
 
 ; ; Starting pCode block
-S_main__tmr_isr	code
-_tmr_isr:
-;	.line	67; main.c	void tmr_isr(void){
+S_main__displayIsr	code
+_displayIsr:
+;	.line	51; main.c	void displayIsr(void){
 	MOVFF	FSR2L, POSTDEC1
 	MOVFF	FSR1L, FSR2L
 	MOVFF	r0x00, POSTDEC1
 	MOVFF	r0x01, POSTDEC1
-;	.line	68; main.c	LATA = LATE = 0;
+;	.line	52; main.c	LATA = LATE = 0;
 	CLRF	_LATE
 	CLRF	_LATA
-;	.line	69; main.c	LATD = number_to_7seg(digit[dsp_en]);
+;	.line	53; main.c	LATD = number_to_7seg(digit[dsp_en]);
 	MOVLW	LOW(_digit)
 	BANKSEL	_dsp_en
 	ADDWF	_dsp_en, W, B
@@ -609,11 +783,11 @@ _tmr_isr:
 	CALL	_number_to_7seg
 	MOVWF	_LATD
 	MOVF	POSTINC1, F
-;	.line	71; main.c	switch (dsp_en) {
+;	.line	55; main.c	switch (dsp_en) {
 	MOVFF	_dsp_en, r0x00
 	MOVLW	0x04
 	SUBWF	r0x00, W
-	BC	_00121_DS_
+	BC	_00126_DS_
 	CLRF	PCLATH
 	CLRF	PCLATU
 	RLCF	r0x00, W
@@ -621,60 +795,115 @@ _tmr_isr:
 	RLCF	WREG, W
 	RLCF	PCLATH, F
 	ANDLW	0xfc
-	ADDLW	LOW(_00139_DS_)
+	ADDLW	LOW(_00144_DS_)
 	MOVWF	POSTDEC1
-	MOVLW	HIGH(_00139_DS_)
+	MOVLW	HIGH(_00144_DS_)
 	ADDWFC	PCLATH, F
-	MOVLW	UPPER(_00139_DS_)
+	MOVLW	UPPER(_00144_DS_)
 	ADDWFC	PCLATU, F
 	MOVF	PREINC1, W
 	MOVWF	PCL
-_00139_DS_:
-	GOTO	_00117_DS_
-	GOTO	_00118_DS_
-	GOTO	_00119_DS_
-	GOTO	_00120_DS_
-_00117_DS_:
-;	.line	73; main.c	LATA = 0;
+_00144_DS_:
+	GOTO	_00122_DS_
+	GOTO	_00123_DS_
+	GOTO	_00124_DS_
+	GOTO	_00125_DS_
+_00122_DS_:
+;	.line	57; main.c	LATA = 0;
 	CLRF	_LATA
-;	.line	74; main.c	LATE = 0x4;
+;	.line	58; main.c	LATE = 0x4;
 	MOVLW	0x04
 	MOVWF	_LATE
-;	.line	75; main.c	break;
-	BRA	_00121_DS_
-_00118_DS_:
-;	.line	77; main.c	LATE = 0x2;
+;	.line	59; main.c	break;
+	BRA	_00126_DS_
+_00123_DS_:
+;	.line	61; main.c	LATE = 0x2;
 	MOVLW	0x02
 	MOVWF	_LATE
-;	.line	78; main.c	break;
-	BRA	_00121_DS_
-_00119_DS_:
-;	.line	80; main.c	LATE = 0x1;
+;	.line	62; main.c	break;
+	BRA	_00126_DS_
+_00124_DS_:
+;	.line	64; main.c	LATE = 0x1;
 	MOVLW	0x01
 	MOVWF	_LATE
-;	.line	81; main.c	break;
-	BRA	_00121_DS_
-_00120_DS_:
-;	.line	83; main.c	LATE = 0;
+;	.line	65; main.c	break;
+	BRA	_00126_DS_
+_00125_DS_:
+;	.line	67; main.c	LATE = 0;
 	CLRF	_LATE
-;	.line	84; main.c	LATA = 0x10;
+;	.line	68; main.c	LATA = 0x10;
 	MOVLW	0x10
 	MOVWF	_LATA
-_00121_DS_:
-;	.line	87; main.c	dsp_en++;
+_00126_DS_:
+;	.line	71; main.c	dsp_en++;
 	MOVFF	_dsp_en, r0x00
 	INCF	r0x00, W
 	BANKSEL	_dsp_en
 	MOVWF	_dsp_en, B
-;	.line	88; main.c	if (dsp_en > 3) dsp_en = 0;
+;	.line	72; main.c	if (dsp_en > 3) dsp_en = 0;
 	MOVLW	0x04
 	BANKSEL	_dsp_en
 	SUBWF	_dsp_en, W, B
-	BNC	_00124_DS_
+	BNC	_00129_DS_
 	BANKSEL	_dsp_en
 	CLRF	_dsp_en, B
-_00124_DS_:
-;	.line	89; main.c	}
+_00129_DS_:
+;	.line	73; main.c	}
+	MOVFF	PREINC1, r0x01
+	MOVFF	PREINC1, r0x00
+	MOVFF	PREINC1, FSR2L
+	RETURN	
+
+; ; Starting pCode block
+S_main__xGetTicks	code
+_xGetTicks:
+;	.line	47; main.c	uint32_t xGetTicks(void) {
+	MOVFF	FSR2L, POSTDEC1
+	MOVFF	FSR1L, FSR2L
+;	.line	48; main.c	return tick_count;
+	MOVFF	(_tick_count + 3), FSR0L
+	MOVFF	(_tick_count + 2), PRODH
+	MOVFF	(_tick_count + 1), PRODL
+	BANKSEL	_tick_count
+	MOVF	_tick_count, W, B
+;	.line	49; main.c	}
+	MOVFF	PREINC1, FSR2L
+	RETURN	
+
+; ; Starting pCode block
+S_main__tmr_isr	code
+_tmr_isr:
+;	.line	39; main.c	void tmr_isr(void){
+	MOVFF	FSR2L, POSTDEC1
+	MOVFF	FSR1L, FSR2L
+	MOVFF	r0x00, POSTDEC1
+	MOVFF	r0x01, POSTDEC1
+	MOVFF	r0x02, POSTDEC1
+	MOVFF	r0x03, POSTDEC1
+;	.line	41; main.c	tick_count++;
+	MOVFF	_tick_count, r0x00
+	MOVFF	(_tick_count + 1), r0x01
+	MOVFF	(_tick_count + 2), r0x02
+	MOVFF	(_tick_count + 3), r0x03
+	MOVF	r0x00, W
+	ADDLW	0x01
+	BANKSEL	_tick_count
+	MOVWF	_tick_count, B
+	MOVLW	0x00
+	ADDWFC	r0x01, W
+	BANKSEL	(_tick_count + 1)
+	MOVWF	(_tick_count + 1), B
+	MOVLW	0x00
+	ADDWFC	r0x02, W
+	BANKSEL	(_tick_count + 2)
+	MOVWF	(_tick_count + 2), B
+	MOVLW	0x00
+	ADDWFC	r0x03, W
+	BANKSEL	(_tick_count + 3)
+	MOVWF	(_tick_count + 3), B
+;	.line	45; main.c	}
+	MOVFF	PREINC1, r0x03
+	MOVFF	PREINC1, r0x02
 	MOVFF	PREINC1, r0x01
 	MOVFF	PREINC1, r0x00
 	MOVFF	PREINC1, FSR2L
@@ -683,7 +912,7 @@ _00124_DS_:
 ; ; Starting pCode block
 S_main__isr	code
 _isr:
-;	.line	59; main.c	void isr(void) __interrupt (1) {
+;	.line	31; main.c	void isr(void) __interrupt (1) {
 	MOVFF	STATUS, POSTDEC1
 	MOVFF	BSR, POSTDEC1
 	MOVWF	POSTDEC1
@@ -695,18 +924,18 @@ _isr:
 	MOVFF	PCLATU, POSTDEC1
 	MOVFF	FSR2L, POSTDEC1
 	MOVFF	FSR1L, FSR2L
-;	.line	60; main.c	if (INTCONbits.TMR0IF){
+;	.line	32; main.c	if (INTCONbits.TMR0IF){
 	BTFSS	_INTCONbits, 2
-	BRA	_00111_DS_
-;	.line	61; main.c	tmr_isr();
+	BRA	_00106_DS_
+;	.line	33; main.c	tmr_isr();
 	CALL	_tmr_isr
-;	.line	62; main.c	TMR0 = RATE;
-	MOVLW	0xfa
+;	.line	34; main.c	TMR0 = RATE;
+	MOVLW	0xfe
 	MOVWF	_TMR0
-_00111_DS_:
-;	.line	64; main.c	INTCONbits.TMR0IF = 0;
+_00106_DS_:
+;	.line	36; main.c	INTCONbits.TMR0IF = 0;
 	BCF	_INTCONbits, 2
-;	.line	65; main.c	}
+;	.line	37; main.c	}
 	MOVFF	PREINC1, FSR2L
 	MOVFF	PREINC1, PCLATU
 	MOVFF	PREINC1, PCLATH
@@ -719,70 +948,11 @@ _00111_DS_:
 	MOVFF	PREINC1, STATUS
 	RETFIE	
 
-; ; Starting pCode block
-S_main__setup	code
-_setup:
-;	.line	25; main.c	void setup(void){
-	MOVFF	FSR2L, POSTDEC1
-	MOVFF	FSR1L, FSR2L
-;	.line	27; main.c	LATD = 0;
-	CLRF	_LATD
-;	.line	28; main.c	TRISD = 0;
-	CLRF	_TRISD
-;	.line	30; main.c	TRISB = 0xff;
-	MOVLW	0xff
-	MOVWF	_TRISB
-;	.line	31; main.c	LATB = 0x00;
-	CLRF	_LATB
-;	.line	32; main.c	ADCON1 = 0xf;
-	MOVLW	0x0f
-	MOVWF	_ADCON1
-;	.line	34; main.c	TRISE = 0;
-	CLRF	_TRISE
-;	.line	35; main.c	LATE = 0;
-	CLRF	_LATE
-;	.line	37; main.c	TRISA = 0;
-	CLRF	_TRISA
-;	.line	38; main.c	LATA = 0;
-	CLRF	_LATA
-;	.line	41; main.c	INTCONbits.GIE = 1;
-	BSF	_INTCONbits, 7
-;	.line	42; main.c	INTCONbits.PEIE = 1;
-	BSF	_INTCONbits, 6
-;	.line	43; main.c	INTCONbits.RBIE = 0;
-	BCF	_INTCONbits, 3
-;	.line	44; main.c	INTCON2bits.RBPU = 0;
-	BCF	_INTCON2bits, 7
-;	.line	45; main.c	INTCON2bits.RBIP = 1;
-	BSF	_INTCON2bits, 0
-;	.line	46; main.c	RCONbits.IPEN = 1;
-	BSF	_RCONbits, 7
-;	.line	49; main.c	INTCONbits.TMR0IE = 1;
-	BSF	_INTCONbits, 5
-;	.line	50; main.c	INTCON2bits.TMR0IP = 1;
-	BSF	_INTCON2bits, 2
-;	.line	52; main.c	T0CONbits.T08BIT = 1;
-	BSF	_T0CONbits, 6
-;	.line	53; main.c	T0CONbits.T0CS = 0; /* Source internal oscilator */
-	BCF	_T0CONbits, 5
-;	.line	54; main.c	T0CONbits.PSA = 0;
-	BCF	_T0CONbits, 3
-;	.line	55; main.c	T0CONbits.T0PS = 0x7;
-	MOVF	_T0CONbits, W
-	ANDLW	0xf8
-	IORLW	0x07
-	MOVWF	_T0CONbits
-;	.line	56; main.c	T0CONbits.TMR0ON = 1;
-	BSF	_T0CONbits, 7
-;	.line	57; main.c	}
-	MOVFF	PREINC1, FSR2L
-	RETURN	
-
 
 
 ; Statistics:
-; code size:	  806 (0x0326) bytes ( 0.61%)
-;           	  403 (0x0193) words
+; code size:	 1108 (0x0454) bytes ( 0.85%)
+;           	  554 (0x022a) words
 ; udata size:	    0 (0x0000) bytes ( 0.00%)
 ; access size:	    9 (0x0009) bytes
 

@@ -10,13 +10,17 @@
 #pragma config MCLRE = OFF
 
 #define NDIGITS 4
-#define RATE 250
+#define RATE 254
+#define TICK_RATE_HZ 1000
 
+volatile static uint32_t tick_count = 0;
 volatile static uint8_t digit[NDIGITS] = { 0 };
 volatile static uint8_t dsp_en = 0;
 
 void isr(void) __interrupt (1);
 void tmr_isr(void);
+uint32_t xGetTicks(void);
+void displayIsr(void);
 uint8_t number_to_7seg(uint8_t);
 void display(uint16_t);
 void start_adc(void);
@@ -33,6 +37,18 @@ void isr(void) __interrupt (1) {
 }
 
 void tmr_isr(void){
+    /* time tracker handler */
+    tick_count++;
+    //PORTD = !PORTD;
+    /* should check tasks and suck but I dont
+     * think I will */
+}
+
+uint32_t xGetTicks(void) {
+    return tick_count;
+}
+
+void displayIsr(void){
     LATA = LATE = 0;
     LATD = number_to_7seg(digit[dsp_en]);
 
@@ -144,13 +160,20 @@ inline void setup(void){
     T0CONbits.T0PS = 0x7;
     T0CONbits.TMR0ON = 1;
 }
+
 int main(void) {
     uint16_t count = 0;
+    uint32_t disptick = 20;
+    uint32_t prevdisptick = xGetTicks();
     setup();
     for (;;) {
-        display(count);
-        delay1ktcy(500);
-        count++;
+        //display(count);
+        //delay1ktcy(500);
+        //count++;
+        if(xGetTicks() - prevdisptick >= disptick) {
+            PORTD = !PORTD;
+            prevdisptick = xGetTicks();
+        }
     }
     return 0;
 }
