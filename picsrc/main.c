@@ -10,7 +10,7 @@
 #pragma config MCLRE = OFF
 
 #define NDIGITS 4
-#define RATE 254
+#define RATE 253
 #define TICK_RATE_HZ 1000
 
 volatile static uint32_t tick_count = 0;
@@ -157,20 +157,20 @@ inline void setup(void){
     T0CONbits.T08BIT = 1;
     T0CONbits.T0CS = 0; /* Source internal oscilator */
     T0CONbits.PSA = 0;
-    T0CONbits.T0PS = 0x7;
+    T0CONbits.T0PS = 0x6;
     T0CONbits.TMR0ON = 1;
 }
 
 int main(void) {
     uint16_t count = 0;
-    uint32_t disptick = 20;
+    uint32_t disptick = 28;
     uint32_t prevdisptick = xGetTicks();
     setup();
     for (;;) {
         //display(count);
         //delay1ktcy(500);
         //count++;
-        if(xGetTicks() - prevdisptick >= disptick) {
+        if(xGetTicks() - prevdisptick == disptick) {
             PORTD = !PORTD;
             prevdisptick = xGetTicks();
         }

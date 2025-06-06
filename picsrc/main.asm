@@ -392,15 +392,15 @@ _main:
 	BCF	_T0CONbits, 5
 ;	.line	159; main.c	T0CONbits.PSA = 0;
 	BCF	_T0CONbits, 3
-;	.line	160; main.c	T0CONbits.T0PS = 0x7;
+;	.line	160; main.c	T0CONbits.T0PS = 0x6;
 	MOVF	_T0CONbits, W
 	ANDLW	0xf8
-	IORLW	0x07
+	IORLW	0x06
 	MOVWF	_T0CONbits
 ;	.line	161; main.c	T0CONbits.TMR0ON = 1;
 	BSF	_T0CONbits, 7
 _00227_DS_:
-;	.line	173; main.c	if(xGetTicks() - prevdisptick >= disptick) {
+;	.line	173; main.c	if(xGetTicks() - prevdisptick == disptick) {
 	CALL	_xGetTicks
 	MOVWF	r0x04
 	MOVFF	PRODL, r0x05
@@ -414,19 +414,18 @@ _00227_DS_:
 	SUBWFB	r0x06, F
 	MOVF	r0x03, W
 	SUBWFB	r0x07, F
-	MOVLW	0x00
-	SUBWF	r0x07, W
+	MOVF	r0x04, W
+	XORLW	0x1c
 	BNZ	_00243_DS_
-	MOVLW	0x00
-	SUBWF	r0x06, W
+	MOVF	r0x05, W
 	BNZ	_00243_DS_
-	MOVLW	0x00
-	SUBWF	r0x05, W
+	MOVF	r0x06, W
 	BNZ	_00243_DS_
-	MOVLW	0x14
-	SUBWF	r0x04, W
+	MOVF	r0x07, W
+	BZ	_00244_DS_
 _00243_DS_:
-	BNC	_00227_DS_
+	BRA	_00227_DS_
+_00244_DS_:
 ;	.line	174; main.c	PORTD = !PORTD;
 	MOVF	_PORTD, W
 	BSF	STATUS, 0
@@ -494,10 +493,10 @@ _setup:
 	BCF	_T0CONbits, 5
 ;	.line	159; main.c	T0CONbits.PSA = 0;
 	BCF	_T0CONbits, 3
-;	.line	160; main.c	T0CONbits.T0PS = 0x7;
+;	.line	160; main.c	T0CONbits.T0PS = 0x6;
 	MOVF	_T0CONbits, W
 	ANDLW	0xf8
-	IORLW	0x07
+	IORLW	0x06
 	MOVWF	_T0CONbits
 ;	.line	161; main.c	T0CONbits.TMR0ON = 1;
 	BSF	_T0CONbits, 7
@@ -930,7 +929,7 @@ _isr:
 ;	.line	33; main.c	tmr_isr();
 	CALL	_tmr_isr
 ;	.line	34; main.c	TMR0 = RATE;
-	MOVLW	0xfe
+	MOVLW	0xfd
 	MOVWF	_TMR0
 _00106_DS_:
 ;	.line	36; main.c	INTCONbits.TMR0IF = 0;
@@ -951,8 +950,8 @@ _00106_DS_:
 
 
 ; Statistics:
-; code size:	 1108 (0x0454) bytes ( 0.85%)
-;           	  554 (0x022a) words
+; code size:	 1104 (0x0450) bytes ( 0.84%)
+;           	  552 (0x0228) words
 ; udata size:	    0 (0x0000) bytes ( 0.00%)
 ; access size:	    9 (0x0009) bytes
 
