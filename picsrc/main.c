@@ -12,6 +12,7 @@
 #define NDIGITS 4
 #define RATE 253
 #define TICK_RATE_HZ 1000
+#define F_CPU 20000000
 
 volatile static uint32_t tick_count = 0;
 volatile static uint8_t digit[NDIGITS] = { 0 };
@@ -24,6 +25,9 @@ void displayIsr(void);
 uint8_t number_to_7seg(uint8_t);
 void display(uint16_t);
 void start_adc(void);
+void usartInit(uint16_t baudrate);
+void usartPutChar(char out);
+char usartGetChar(void);
 inline void setup(void);
 int main(void);
 
@@ -127,6 +131,27 @@ void start_adc(void) {
     ADCON2bits.ADCS = 0x1; 
     ADCON0bits.ADON = 1;
 }
+void usartInit(uint16_t baudrate) {
+    float spb = (F_CPU/(64*baudrate))-1;
+    SPBRG = (int)spb;
+    TRISCbits.TRISC7 = 1;
+    TRISCbits.TRISC6 = 0;
+    RCSTA = 0x90;
+    /*TXSTA = 0x20;*/
+}
+void usartPutChar(uint8_t out) {
+    while (!PIR1bits.TXIF);
+    TXREG = out;
+}
+char usartGetChar() {
+    while (!PIR1bits.RCIF);
+    if (RCSTAbits.OERR) {
+        RCSTAbits.CREN = 0;
+        __asm__("nop");
+        RCSTAbits.CREN = 1;
+    }
+    return RCREG;
+}
 inline void setup(void){
     /* Port setup */
     LATD = 0;
@@ -167,9 +192,6 @@ int main(void) {
     uint32_t prevdisptick = xGetTicks();
     setup();
     for (;;) {
-        //display(count);
-        //delay1ktcy(500);
-        //count++;
         if(xGetTicks() - prevdisptick == disptick) {
             PORTD = !PORTD;
             prevdisptick = xGetTicks();
