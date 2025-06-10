@@ -51,6 +51,7 @@ void tmr_isr(void){
     __endasm;
     servo_write();
     usartGetText(servos, AXES);
+    tick_count++;
 }
 
 uint32_t xGetTicks(void) {
@@ -221,15 +222,43 @@ inline void setup(void){
 int main(void) {
     setup();
     usartInit(115200);
-    PORTD = 0xff;
-    servos[0]= 00;
-    servos[1]= 30;
-    servos[2]= 60;
-    servos[3]= 70;
-    servos[4]= 50;
-    servos[5]= 50;
+    uint32_t prev_tick0 = xGetTicks();
+    uint32_t prev_tick1 = xGetTicks();
+    uint32_t prev_tick2 = xGetTicks();
+    uint32_t prev_tick3 = xGetTicks();
+    uint32_t delay1 = 200;
+    uint32_t delay2 = 200;
+    uint32_t delay3 = 200;
+    uint32_t delay4 = 200;
     for (;;) {
     /* the rest of free cycles are meant for communication */
+        if(xGetTicks() -prev_tick0 >= delay1){
+            servos[0]= 00;
+            servos[1]= 30;
+            servos[2]= 60;
+            servos[3]= 70;
+            servos[4]= 50;
+            servos[5]= 50;
+            prev_tick0 = xGetTicks();
+        }
+        //if(xGetTicks() -prev_tick0 >= delay1){
+        //    servos[0]= 00;
+        //    servos[1]= 30;
+        //    servos[2]= 60;
+        //    servos[3]= 70;
+        //    servos[4]= 50;
+        //    servos[5]= 50;
+        //    prev_tick0 = xGetTicks();
+        //}
+        //if(xGetTicks() -prev_tick0 >= delay1){
+        //    servos[0]= 00;
+        //    servos[1]= 30;
+        //    servos[2]= 60;
+        //    servos[3]= 70;
+        //    servos[4]= 50;
+        //    servos[5]= 50;
+        //    prev_tick0 = xGetTicks();
+        //}
         
     }
     return 0;
