@@ -1,14 +1,35 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/queue.h"
 #include "esp_log.h"
-#include "/driver/gpio.h"
+#include "driver/gpio.h"
 #include "hal/uart_types.h"
+#include "portmacro.h"
 #include "driver/uart.h"
 
+QueueHandle_t servoQueue;
 static void IRAM_ATTR uart_task(void* pvParameters)
 {
+    uint8_t data[6];
+    data[0] = 20;
+    data[1] = 40;
+    data[2] = 50;
+    data[3] = 60;
+    data[4] = 50;
+    data[5] = 00;
+    uart_write_bytes(UART_NUM_2, data, 6);
+    vTaskDelay(1000/portTICK_PERIOD_MS);
+    data[0] = 50;
+    data[1] = 20;
+    data[2] = 70;
+    data[3] = 20;
+    data[4] = 40;
+    data[5] = 40;
+    uart_write_bytes(UART_NUM_2, data, 6);
+    vTaskDelay(1000/portTICK_PERIOD_MS);
 
 }
 static void uart_init() {
