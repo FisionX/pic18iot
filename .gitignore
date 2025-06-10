@@ -1,3 +1,4 @@
 *.lst
 *.cod
 *.o
+*/build/*
