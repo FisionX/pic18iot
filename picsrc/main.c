@@ -10,13 +10,15 @@
 #pragma config MCLRE = OFF
 
 #define NDIGITS 4
-#define RATE 253
 #define TICK_RATE_HZ 1000
 #define F_CPU 20000000
+#define RATE 60
+#define CALIBRATE 150
 
 volatile static uint32_t tick_count = 0;
 volatile static uint8_t digit[NDIGITS] = { 0 };
 volatile static uint8_t dsp_en = 0;
+volatile static uint8_t servos[6];
 
 void isr(void) __interrupt (1);
 void tmr_isr(void);
@@ -28,6 +30,7 @@ void start_adc(void);
 void usartInit(uint16_t baudrate);
 void usartPutChar(char out);
 char usartGetChar(void);
+void servo_write(void);
 inline void setup(void);
 int main(void);
 
@@ -42,8 +45,11 @@ void isr(void) __interrupt (1) {
 
 void tmr_isr(void){
     /* time tracker handler */
-    tick_count++;
-    //PORTD = !PORTD;
+    //tick_count++;
+    __asm
+        SETF _PORTD
+    __endasm;
+    servo_write();
     /* should check tasks and suck but I dont
      * think I will */
 }
@@ -143,7 +149,7 @@ void usartPutChar(uint8_t out) {
     while (!PIR1bits.TXIF);
     TXREG = out;
 }
-char usartGetChar() {
+char usartGetChar(void) {
     while (!PIR1bits.RCIF);
     if (RCSTAbits.OERR) {
         RCSTAbits.CREN = 0;
@@ -152,10 +158,26 @@ char usartGetChar() {
     }
     return RCREG;
 }
+void servo_write(void){
+    uint8_t i = 0;
+    for(i = 0; i < CALIBRATE; i++);
+    for(i = 0; i < 90; i++){
+        if( i == servos[0] )
+            __asm__("bcf _LATD, 0");
+        if( i == servos[1] )
+            __asm__("bcf _LATD, 1");
+        if( i == servos[2] )
+            __asm__("bcf _LATD, 2");
+        if( i == servos[3] )
+            __asm__("bcf _LATD, 3");
+        if( i == servos[4] )
+            __asm__("bcf _LATD, 4");
+    }
+}
 inline void setup(void){
     /* Port setup */
-    LATD = 0;
     TRISD = 0;
+    PORTD = 0x00;
     
     TRISB = 0xff;
     LATB = 0x00;
@@ -187,15 +209,17 @@ inline void setup(void){
 }
 
 int main(void) {
-    uint16_t count = 0;
-    uint32_t disptick = 28;
-    uint32_t prevdisptick = xGetTicks();
     setup();
+    PORTD = 0xff;
+    servos[0]= 00;
+    servos[1]= 30;
+    servos[2]= 60;
+    servos[3]= 90;
+    servos[4]= 50;
+    servos[5]= 50;
     for (;;) {
-        if(xGetTicks() - prevdisptick == disptick) {
-            PORTD = !PORTD;
-            prevdisptick = xGetTicks();
-        }
+    /* the rest of free cycles are for communication */
+        
     }
     return 0;
 }
