@@ -413,8 +413,8 @@ _main:
 	MOVLW	0x3c
 	BANKSEL	(_servos + 2)
 	MOVWF	(_servos + 2), B
-;	.line	197; main.c	servos[3]= 80;
-	MOVLW	0x50
+;	.line	197; main.c	servos[3]= 90;
+	MOVLW	0x5a
 	BANKSEL	(_servos + 3)
 	MOVWF	(_servos + 3), B
 ;	.line	198; main.c	servos[4]= 50;

@@ -194,7 +194,7 @@ int main(void) {
     servos[0]= 00;
     servos[1]= 30;
     servos[2]= 60;
-    servos[3]= 80;
+    servos[3]= 90;
     servos[4]= 50;
     servos[5]= 50;
     for (;;) {
