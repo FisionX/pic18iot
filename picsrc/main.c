@@ -12,11 +12,12 @@
 #define NDIGITS 4
 #define RATE 60
 #define TICK_RATE_HZ 1000
-#define CALIBRATE 0
+#define CALIBRATE 180
 
 volatile static uint32_t tick_count = 0;
 volatile static uint8_t digit[NDIGITS] = { 0 };
 volatile static uint8_t dsp_en = 0;
+volatile static uint8_t servos[6];
 
 void isr(void) __interrupt (1);
 void tmr_isr(void);
@@ -25,7 +26,7 @@ void displayIsr(void);
 uint8_t number_to_7seg(uint8_t);
 void display(uint16_t);
 void start_adc(void);
-void servo_write(char *angle);
+void servo_write();
 inline void setup(void);
 int main(void);
 
@@ -41,7 +42,10 @@ void isr(void) __interrupt (1) {
 void tmr_isr(void){
     /* time tracker handler */
     //tick_count++;
-    PORTD = !PORTD;
+    __asm
+        SETF _PORTD
+    __endasm;
+    servo_write();
     /* should check tasks and suck but I dont
      * think I will */
 }
@@ -129,21 +133,21 @@ void start_adc(void) {
     ADCON2bits.ADCS = 0x1; 
     ADCON0bits.ADON = 1;
 }
-void servo_write(char *angle){
+void servo_write(){
     uint8_t i = 0;
     uint8_t temp = 0;
-    for(i = CALIBRATE; i < 254; i++){
-        //temp = i + CALIBRATE;
-        if( temp == angle[0] )
-            PORTDbits.RD0 = 0;
-        if( temp == angle[1] )
-            PORTDbits.RD1 = 0;
-        if( temp == angle[2] )
-            PORTDbits.RD2 = 0;
-        if( temp == angle[3] )
-            PORTDbits.RD3 = 0;
-        if( temp == angle[4] )
-            PORTDbits.RD4 = 0;
+    for(i = 30; i < CALIBRATE; i++);
+    for(i = 0; i < 200; i++){
+        if( i == servos[0] )
+            __asm__("bcf _LATD, 0");
+        if( i == servos[1] )
+            __asm__("bcf _LATD, 1");
+        if( i == servos[2] )
+            __asm__("bcf _LATD, 2");
+        if( i == servos[3] )
+            __asm__("bcf _LATD, 3");
+        if( i == servos[4] )
+            __asm__("bcf _LATD, 4");
         //if( i == angle[5] + CALIBRATE)
         //    PORTDbits.RD5 = 0;
     }
@@ -183,15 +187,14 @@ inline void setup(void){
 }
 
 int main(void) {
-    uint8_t servos[6] = {0};
     uint32_t disptick = 45;
     uint32_t prevdisptick = xGetTicks();
     setup();
     PORTD = 0xff;
-    servos[0]= 0;
+    servos[0]= 00;
     servos[1]= 30;
-    servos[2]= 50;
-    servos[3]= 50;
+    servos[2]= 60;
+    servos[3]= 80;
     servos[4]= 50;
     servos[5]= 50;
     for (;;) {
