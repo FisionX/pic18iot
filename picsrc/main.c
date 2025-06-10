@@ -10,12 +10,14 @@
 #pragma config MCLRE = OFF
 
 #define NDIGITS 4
-#define RATE 254
+#define RATE 60
 #define TICK_RATE_HZ 1000
+#define CALIBRATE 180
 
 volatile static uint32_t tick_count = 0;
 volatile static uint8_t digit[NDIGITS] = { 0 };
 volatile static uint8_t dsp_en = 0;
+volatile static uint8_t servos[6];
 
 void isr(void) __interrupt (1);
 void tmr_isr(void);
@@ -24,6 +26,7 @@ void displayIsr(void);
 uint8_t number_to_7seg(uint8_t);
 void display(uint16_t);
 void start_adc(void);
+void servo_write();
 inline void setup(void);
 int main(void);
 
@@ -38,8 +41,11 @@ void isr(void) __interrupt (1) {
 
 void tmr_isr(void){
     /* time tracker handler */
-    tick_count++;
-    //PORTD = !PORTD;
+    //tick_count++;
+    __asm
+        SETF _PORTD
+    __endasm;
+    servo_write();
     /* should check tasks and suck but I dont
      * think I will */
 }
@@ -127,10 +133,29 @@ void start_adc(void) {
     ADCON2bits.ADCS = 0x1; 
     ADCON0bits.ADON = 1;
 }
+void servo_write(){
+    uint8_t i = 0;
+    uint8_t temp = 0;
+    for(i = 30; i < CALIBRATE; i++);
+    for(i = 0; i < 200; i++){
+        if( i == servos[0] )
+            __asm__("bcf _LATD, 0");
+        if( i == servos[1] )
+            __asm__("bcf _LATD, 1");
+        if( i == servos[2] )
+            __asm__("bcf _LATD, 2");
+        if( i == servos[3] )
+            __asm__("bcf _LATD, 3");
+        if( i == servos[4] )
+            __asm__("bcf _LATD, 4");
+        //if( i == angle[5] + CALIBRATE)
+        //    PORTDbits.RD5 = 0;
+    }
+}
 inline void setup(void){
     /* Port setup */
-    LATD = 0;
     TRISD = 0;
+    PORTD = 0x00;
     
     TRISB = 0xff;
     LATB = 0x00;
@@ -157,23 +182,33 @@ inline void setup(void){
     T0CONbits.T08BIT = 1;
     T0CONbits.T0CS = 0; /* Source internal oscilator */
     T0CONbits.PSA = 0;
-    T0CONbits.T0PS = 0x7;
+    T0CONbits.T0PS = 0x6;
     T0CONbits.TMR0ON = 1;
 }
 
 int main(void) {
-    uint16_t count = 0;
-    uint32_t disptick = 20;
+    uint32_t disptick = 45;
     uint32_t prevdisptick = xGetTicks();
     setup();
+    PORTD = 0xff;
+    servos[0]= 00;
+    servos[1]= 30;
+    servos[2]= 60;
+    servos[3]= 90;
+    servos[4]= 50;
+    servos[5]= 50;
     for (;;) {
         //display(count);
         //delay1ktcy(500);
         //count++;
-        if(xGetTicks() - prevdisptick >= disptick) {
-            PORTD = !PORTD;
-            prevdisptick = xGetTicks();
-        }
+        //if(xGetTicks() - prevdisptick >= disptick) {
+        //    //PORTD = !PORTD;
+        //    PORTD = 0xff;
+        //    prevdisptick = xGetTicks();
+        //    servo_write(servos);
+        //}
+    /* the rest of free cycles are for communication */
+        
     }
     return 0;
 }
