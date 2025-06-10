@@ -13,11 +13,13 @@
 #define RATE 60
 #define TICK_RATE_HZ 1000
 #define CALIBRATE 180
+#define SPEED 150
 
 volatile static uint32_t tick_count = 0;
 volatile static uint8_t digit[NDIGITS] = { 0 };
 volatile static uint8_t dsp_en = 0;
 volatile static uint8_t servos[6];
+volatile static uint8_t pose[16];
 
 void isr(void) __interrupt (1);
 void tmr_isr(void);
@@ -26,7 +28,7 @@ void displayIsr(void);
 uint8_t number_to_7seg(uint8_t);
 void display(uint16_t);
 void start_adc(void);
-void servo_write();
+void servo_write(void);
 inline void setup(void);
 int main(void);
 
@@ -41,7 +43,7 @@ void isr(void) __interrupt (1) {
 
 void tmr_isr(void){
     /* time tracker handler */
-    //tick_count++;
+    tick_count++;
     __asm
         SETF _PORTD
     __endasm;
@@ -148,8 +150,8 @@ void servo_write(){
             __asm__("bcf _LATD, 3");
         if( i == servos[4] )
             __asm__("bcf _LATD, 4");
-        //if( i == angle[5] + CALIBRATE)
-        //    PORTDbits.RD5 = 0;
+        if( i == servos[5] )
+            __asm__("bcf _LATD, 5");
     }
 }
 inline void setup(void){
@@ -185,30 +187,110 @@ inline void setup(void){
     T0CONbits.T0PS = 0x6;
     T0CONbits.TMR0ON = 1;
 }
-
+#define closed 1
 int main(void) {
     uint32_t disptick = 45;
-    uint32_t prevdisptick = xGetTicks();
+    uint32_t prev1 = xGetTicks();
+    uint32_t t1 = 50;
     setup();
     PORTD = 0xff;
-    servos[0]= 00;
+    servos[0]= 50;
     servos[1]= 30;
-    servos[2]= 60;
-    servos[3]= 90;
-    servos[4]= 50;
-    servos[5]= 50;
+    servos[2]= 20;
+    servos[3]= 40;
+    servos[4]= 40;
+    servos[5]= 10;
+start:
     for (;;) {
-        //display(count);
-        //delay1ktcy(500);
-        //count++;
-        //if(xGetTicks() - prevdisptick >= disptick) {
-        //    //PORTD = !PORTD;
-        //    PORTD = 0xff;
-        //    prevdisptick = xGetTicks();
-        //    servo_write(servos);
-        //}
-    /* the rest of free cycles are for communication */
-        
+        if(xGetTicks() - prev1 >= t1){
+            prev1 = xGetTicks();
+            break;
+        }
+
+        servos[0]= 60;
+        servos[1]= 30;
+        servos[2]= 10;
+        servos[4]= 30;
+        servos[5]= 20;
     }
+    for (;;) {
+        if(xGetTicks() - prev1 >= t1){
+            prev1 = xGetTicks();
+            break;
+        }
+        servos[0]= 60;
+        servos[1]= 30;
+        servos[2]= 12;
+        servos[4]= 22;
+        servos[5]= 20;
+    }
+    for (;;) {
+        if(xGetTicks() - prev1 >= t1){
+            prev1 = xGetTicks();
+            break;
+        }
+        servos[0]= 00;
+        servos[1]= 30;
+        servos[2]= 12;
+        servos[4]= 22;
+        servos[5]= 20;
+    }
+    for (;;) {
+        if(xGetTicks() - prev1 >= t1){
+            prev1 = xGetTicks();
+            break;
+        }
+        servos[0]= closed;
+        servos[1]= 30;
+        servos[2]= 10;
+        servos[4]= 35;
+        servos[5]= 20;
+    }
+    for (;;) {
+        if(xGetTicks() - prev1 >= t1){
+            prev1 = xGetTicks();
+            break;
+        }
+        servos[0]= closed;
+        servos[1]= 30;
+        servos[2]= 10;
+        servos[4]= 35;
+        servos[5]= 45;
+    }
+    for (;;) {
+        if(xGetTicks() - prev1 >= t1){
+            prev1 = xGetTicks();
+            break;
+        }
+        servos[0]= closed;
+        servos[1]= 30;
+        servos[2]= 10;
+        servos[4]= 25;
+        servos[5]= 45;
+    }
+    for (;;) {
+        if(xGetTicks() - prev1 >= t1){
+            prev1 = xGetTicks();
+            break;
+        }
+        servos[0]= 50;
+        servos[1]= 30;
+        servos[2]= 10;
+        servos[4]= 25;
+        servos[5]= 45;
+    }
+    for (;;) {
+        if(xGetTicks() - prev1 >= t1){
+            prev1 = xGetTicks();
+            break;
+        }
+        servos[0]= 50;
+        servos[1]= 30;
+        servos[2]= 10;
+        servos[4]= 35;
+        servos[5]= 45;
+    }
+    goto start;
+        
     return 0;
 }
