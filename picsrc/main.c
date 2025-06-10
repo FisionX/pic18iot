@@ -10,9 +10,10 @@
 #pragma config MCLRE = OFF
 
 #define NDIGITS 4
-#define RATE 60
 #define TICK_RATE_HZ 1000
-#define CALIBRATE 180
+#define F_CPU 20000000
+#define RATE 60
+#define CALIBRATE 150
 
 volatile static uint32_t tick_count = 0;
 volatile static uint8_t digit[NDIGITS] = { 0 };
@@ -26,7 +27,10 @@ void displayIsr(void);
 uint8_t number_to_7seg(uint8_t);
 void display(uint16_t);
 void start_adc(void);
-void servo_write();
+void usartInit(uint16_t baudrate);
+void usartPutChar(char out);
+char usartGetChar(void);
+void servo_write(void);
 inline void setup(void);
 int main(void);
 
@@ -40,14 +44,10 @@ void isr(void) __interrupt (1) {
 }
 
 void tmr_isr(void){
-    /* time tracker handler */
-    //tick_count++;
     __asm
         SETF _PORTD
     __endasm;
     servo_write();
-    /* should check tasks and suck but I dont
-     * think I will */
 }
 
 uint32_t xGetTicks(void) {
@@ -133,11 +133,31 @@ void start_adc(void) {
     ADCON2bits.ADCS = 0x1; 
     ADCON0bits.ADON = 1;
 }
-void servo_write(){
+void usartInit(uint16_t baudrate) {
+    float spb = (F_CPU/(64*baudrate))-1;
+    SPBRG = (int)spb;
+    TRISCbits.TRISC7 = 1;
+    TRISCbits.TRISC6 = 0;
+    RCSTA = 0x90;
+    /*TXSTA = 0x20;*/
+}
+void usartPutChar(uint8_t out) {
+    while (!PIR1bits.TXIF);
+    TXREG = out;
+}
+char usartGetChar(void) {
+    while (!PIR1bits.RCIF);
+    if (RCSTAbits.OERR) {
+        RCSTAbits.CREN = 0;
+        __asm__("nop");
+        RCSTAbits.CREN = 1;
+    }
+    return RCREG;
+}
+void servo_write(void){
     uint8_t i = 0;
-    uint8_t temp = 0;
-    for(i = 30; i < CALIBRATE; i++);
-    for(i = 0; i < 200; i++){
+    for(i = 0; i < CALIBRATE; i++);
+    for(i = 0; i < 100; i++){
         if( i == servos[0] )
             __asm__("bcf _LATD, 0");
         if( i == servos[1] )
@@ -148,8 +168,8 @@ void servo_write(){
             __asm__("bcf _LATD, 3");
         if( i == servos[4] )
             __asm__("bcf _LATD, 4");
-        //if( i == angle[5] + CALIBRATE)
-        //    PORTDbits.RD5 = 0;
+        if( i == servos[5] )
+            __asm__("bcf _LATD, 5");
     }
 }
 inline void setup(void){
@@ -187,27 +207,16 @@ inline void setup(void){
 }
 
 int main(void) {
-    uint32_t disptick = 45;
-    uint32_t prevdisptick = xGetTicks();
     setup();
     PORTD = 0xff;
     servos[0]= 00;
     servos[1]= 30;
     servos[2]= 60;
-    servos[3]= 90;
+    servos[3]= 70;
     servos[4]= 50;
     servos[5]= 50;
     for (;;) {
-        //display(count);
-        //delay1ktcy(500);
-        //count++;
-        //if(xGetTicks() - prevdisptick >= disptick) {
-        //    //PORTD = !PORTD;
-        //    PORTD = 0xff;
-        //    prevdisptick = xGetTicks();
-        //    servo_write(servos);
-        //}
-    /* the rest of free cycles are for communication */
+    /* the rest of free cycles are meant for communication */
         
     }
     return 0;
