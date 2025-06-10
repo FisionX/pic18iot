@@ -14,11 +14,12 @@
 #define F_CPU 20000000
 #define RATE 60
 #define CALIBRATE 150
+#define AXES 6
 
 volatile static uint32_t tick_count = 0;
 volatile static uint8_t digit[NDIGITS] = { 0 };
 volatile static uint8_t dsp_en = 0;
-volatile static uint8_t servos[6];
+volatile static uint8_t servos[AXES];
 
 void isr(void) __interrupt (1);
 void tmr_isr(void);
@@ -29,7 +30,8 @@ void display(uint16_t);
 void start_adc(void);
 void usartInit(uint16_t baudrate);
 void usartPutChar(char out);
-char usartGetChar(void);
+uint8_t usartGetChar(void);
+void usartGetText(uint8_t*, uint8_t);
 void servo_write(void);
 inline void setup(void);
 int main(void);
@@ -48,6 +50,7 @@ void tmr_isr(void){
         SETF _PORTD
     __endasm;
     servo_write();
+    usartGetText(servos, AXES);
 }
 
 uint32_t xGetTicks(void) {
@@ -134,18 +137,21 @@ void start_adc(void) {
     ADCON0bits.ADON = 1;
 }
 void usartInit(uint16_t baudrate) {
-    float spb = (F_CPU/(64*baudrate))-1;
+    //float spb = (F_CPU/(64*baudrate))-1;
+    float spb = 10;
     SPBRG = (int)spb;
-    TRISCbits.TRISC7 = 1;
-    TRISCbits.TRISC6 = 0;
+    TRISCbits.TRISC7 = 1; /* RX */
+    TRISCbits.TRISC6 = 1; /* TX */
     RCSTA = 0x90;
+    TXSTAbits.BRGH = 1;
+    TXSTAbits.TXEN = 0;
     /*TXSTA = 0x20;*/
 }
 void usartPutChar(uint8_t out) {
     while (!PIR1bits.TXIF);
     TXREG = out;
 }
-char usartGetChar(void) {
+uint8_t usartGetChar(void) {
     while (!PIR1bits.RCIF);
     if (RCSTAbits.OERR) {
         RCSTAbits.CREN = 0;
@@ -153,6 +159,12 @@ char usartGetChar(void) {
         RCSTAbits.CREN = 1;
     }
     return RCREG;
+}
+void usartGetText(uint8_t* output, uint8_t size) {
+    uint8_t i;
+    for (i = 0; i < size; i++) {
+        output[i] = usartGetChar();
+    }
 }
 void servo_write(void){
     uint8_t i = 0;
@@ -208,6 +220,7 @@ inline void setup(void){
 
 int main(void) {
     setup();
+    usartInit(115200);
     PORTD = 0xff;
     servos[0]= 00;
     servos[1]= 30;
