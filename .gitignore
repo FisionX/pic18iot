@@ -2,3 +2,5 @@
 *.cod
 *.o
 */build/*
+sdkconfig.old
+.cache/
