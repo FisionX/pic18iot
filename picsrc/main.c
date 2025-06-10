@@ -44,14 +44,10 @@ void isr(void) __interrupt (1) {
 }
 
 void tmr_isr(void){
-    /* time tracker handler */
-    //tick_count++;
     __asm
         SETF _PORTD
     __endasm;
     servo_write();
-    /* should check tasks and suck but I dont
-     * think I will */
 }
 
 uint32_t xGetTicks(void) {
@@ -161,7 +157,7 @@ char usartGetChar(void) {
 void servo_write(void){
     uint8_t i = 0;
     for(i = 0; i < CALIBRATE; i++);
-    for(i = 0; i < 90; i++){
+    for(i = 0; i < 100; i++){
         if( i == servos[0] )
             __asm__("bcf _LATD, 0");
         if( i == servos[1] )
@@ -172,6 +168,8 @@ void servo_write(void){
             __asm__("bcf _LATD, 3");
         if( i == servos[4] )
             __asm__("bcf _LATD, 4");
+        if( i == servos[5] )
+            __asm__("bcf _LATD, 5");
     }
 }
 inline void setup(void){
@@ -214,11 +212,11 @@ int main(void) {
     servos[0]= 00;
     servos[1]= 30;
     servos[2]= 60;
-    servos[3]= 90;
+    servos[3]= 70;
     servos[4]= 50;
     servos[5]= 50;
     for (;;) {
-    /* the rest of free cycles are for communication */
+    /* the rest of free cycles are meant for communication */
         
     }
     return 0;
